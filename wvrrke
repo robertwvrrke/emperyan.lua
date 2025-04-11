@@ -3564,61 +3564,546 @@ RightGroupBox:AddLabel('Fog Color Picker'):AddColorPicker('FogColorPicker', {
     initializeSeats()
     monitorNewSeats()
 
-RightGroupBox = Tabs.Misc:AddRightGroupbox('Auto Drop Cash')
+local RightGroupBox = Tabs.Misc:AddRightGroupbox('gun modification')
 
-    RightGroupBox:AddToggle('MyToggle', {
-        Text = 'Auto Drop Cash',
-        Default = false, -- Default value (true / false)
-        Tooltip = 'Automatically drops cash', -- Information shown when you hover over the toggle
-    
-        Callback = function(Value)
-            -- Locals
-local Player = game:GetService("Players").LocalPlayer
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local MainScreenGui = Player.PlayerGui.MainScreenGui
-local MoneyText = MainScreenGui.MoneyText
+RightGroupBox:AddToggle('MyToggle', {
+    Text = 'resolver',
+    Default = false,
+    Tooltip = 'for destroy anti aims',
 
--- Global variable to track Money Drop state
-getgenv().moneyDropEnabled = getgenv().moneyDropEnabled or false -- Initialize as false if not already set
+    Callback = function(Value)
+        if Value then
+            -- Resolver logic
+            Recalculate = LPH_NO_VIRTUALIZE(function(Character)
+                local Pos = Character.HumanoidRootPart.Position
+                local Tick = tick()
 
--- Function to safely extract the money amount from the text
-local function getMoneyAmount()
-    local moneyText = MoneyText.Text:match("%$(%d[%,%d]*)")  -- Extract the money amount after "$"
-    if moneyText then
-        local cleanedMoneyString = moneyText:gsub(",", "")  -- Remove commas
-        local amount = tonumber(cleanedMoneyString)  -- Convert to number
-        return amount or 0  -- If the conversion fails, return 0
-    else
-        return 0
-    end
-end
+                task.wait(0.1)
 
--- Function to drop money
-local function dropMoney(amountToDrop)
-    if amountToDrop > 0 then
-        ReplicatedStorage.MainEvent:FireServer("DropMoney", tostring(amountToDrop))  -- Convert amount to string
-    end
-end
+                local NewPos = Character.HumanoidRootPart.Position
+                local NewTick = tick()
 
--- Function to enable or disable the money drop
-local function toggleMoneyDrop()
-    getgenv().moneyDropEnabled = not getgenv().moneyDropEnabled -- Toggle the state
-end
+                local Delta = NewTick - Tick
+                local PositionDifference = NewPos - Pos
+                local Velocity = PositionDifference / Delta
 
--- Main loop (this will stop doing anything when moneyDropEnabled is false)
-RunService.Heartbeat:Connect(function()
-    if getgenv().moneyDropEnabled then
-        local money = getMoneyAmount()  -- Get the current money amount
-        dropMoney(money < 15000 and money or 15000)  -- Drop all money if under 15,000, or drop 15,000
-    end
-end)
-
--- Call this function to toggle the money drop
-toggleMoneyDrop()  -- Toggle the money drop (enable or disable)
+                return Velocity
+            end)
+        else
+            Recalculate = nil -- Optionally disable/reset the resolver
         end
-    })
-    
+    end
+})
+
+local RightGroupBox = Tabs.Misc:AddRightGroupbox('AL')
+
+RightGroupBox:AddToggle('MyToggle', {
+    Text = 'Anti lock',
+    Default = false,
+    Tooltip = 'Anti lock key bind M',
+
+    Callback = function(Value)
+        if Value then
+            -- Enable anti lock
+            getgenv().Desync = false -- keep it off initially
+            getgenv().DirectionToShoot = "Behind"
+
+            getgenv().KeyBind = Enum.KeyCode.M          -- Optional keybind to toggle Desync manually
+            -- change this to your preferred key
+
+            -- Direction setup
+            local directions = {
+                Behind = Vector3.new(0, 0, -1),
+                Down = Vector3.new(0, -1, 0),
+                ForWard = Vector3.new(0, 0, 1),
+                Left = Vector3.new(-1, 0, 0),
+                One = Vector3.new(1, 1, 1),
+                Right = Vector3.new(1, 0, 0),
+                Up = Vector3.new(0, 1, 0),
+                Zero = Vector3.new(0, 0, 0)
+            }
+
+            getgenv().Direction = directions[getgenv().DirectionToShoot] or Vector3.new(0, 0, -1)
+
+            -- Toggle key input
+            if not getgenv()._desync_key_connection then
+                getgenv()._desync_key_connection = game:GetService("UserInputService").InputBegan:Connect(function(a, t)
+                    if not t and a.KeyCode == getgenv().KeyBind then
+                        getgenv().Desync = not getgenv().Desync
+                        game.StarterGui:SetCore("SendNotification", {
+                            Title = "prime",
+                            Text = getgenv().Desync and "ON" or "TURNED OFF",
+                            Icon = "rbxassetid://57254792",
+                            Duration = 5,
+                        })
+                    end
+                end)
+            end
+
+            -- Start heartbeat loop
+            if not getgenv()._desync_loop then
+                getgenv()._desync_loop = game:GetService("RunService").Heartbeat:Connect(function()
+                    if getgenv().Desync then
+                        local char = game.Players.LocalPlayer.Character
+                        if char and char:FindFirstChild("HumanoidRootPart") then
+                            local root = char.HumanoidRootPart
+                            local original = root.Velocity
+                            root.Velocity = getgenv().Direction * (2^16)
+                            game:GetService("RunService").RenderStepped:Wait()
+                            root.Velocity = original
+                        end
+                    end
+                end)
+            end
+        else
+            -- Disable anti lock
+            getgenv().Desync = false
+        end
+    end
+})
+
+
+local RightGroupBox = Tabs.Misc:AddRightGroupbox('Desyncs')
+
+RightGroupBox:AddToggle('MyToggle', {
+    Text = 'Desyncs',
+    Default = false,
+    Tooltip = 'Desyncs',
+
+    Callback = function(Value)
+        if Value then
+            -- Toggle turned ON
+
+            local velMax = (128 ^ 2)
+            local timeRelease, timeChoke = 0.015, 0.105
+
+            local Property, Wait = sethiddenproperty, wait
+            local Radian, Random, Ceil = math.rad, math.random, math.ceil
+            local Angle = CFrame.Angles
+            local Vector = Vector3.new
+            local Service = game.GetService
+
+            local Run = Service(game, 'RunService')
+            local statPing = Service(game, 'Stats').PerformanceStats.Ping
+            local Players = Service(game, 'Players')
+            local LocalPlayer = Players.LocalPlayer
+
+            -- Setup runtime flags to manage toggle lifecycle
+            getgenv()._desync_active = true
+
+            local function Ping()
+                return statPing:GetValue()
+            end
+
+            local function Sleep()
+                local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    Property(root, 'NetworkIsSleeping', true)
+                end
+            end
+
+            local function Init()
+                local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+
+                local rootVel = root.Velocity
+                local rootAng = Random(-180, 180)
+                local rootOffset = Vector(Random(-velMax, velMax), -Random(0, velMax), Random(-velMax, velMax))
+
+                root.CFrame *= Angle(0, Radian(rootAng), 0)
+                root.Velocity = rootOffset
+
+                Run.RenderStepped:Wait()
+                root.CFrame *= Angle(0, Radian(-rootAng), 0)
+                root.Velocity = rootVel
+            end
+
+            -- Heartbeat loop for Init
+            getgenv()._desync_heartbeat = Run.Heartbeat:Connect(function()
+                if getgenv()._desync_active then
+                    pcall(Init)
+                end
+            end)
+
+            -- Main choke loop
+            task.spawn(function()
+                while getgenv()._desync_active do
+                    local chokeClient = Run.Heartbeat:Connect(Sleep)
+                    local chokeServer = Run.RenderStepped:Connect(Sleep)
+
+                    Wait(Ceil(Ping()) / 1000)
+
+                    chokeClient:Disconnect()
+                    chokeServer:Disconnect()
+                    Wait(timeRelease)
+                end
+            end)
+        else
+            -- Toggle turned OFF
+            getgenv()._desync_active = false
+            if getgenv()._desync_heartbeat then
+                getgenv()._desync_heartbeat:Disconnect()
+                getgenv()._desync_heartbeat = nil
+            end
+        end
+    end
+})
+
+local RightGroupBox = Tabs.Misc:AddRightGroupbox('Auto Fling All')
+
+RightGroupBox:AddToggle('MyToggle', {
+    Text = 'Auto Fling',
+    Default = false,
+    Tooltip = 'Automatically flings all players DETECT',
+
+    Callback = function(Value)
+        if Value then
+            -- Enable Auto Fling
+            local Players = game:GetService("Players")
+            local Player = Players.LocalPlayer
+
+            local AllBool = false
+            local Targets = {"All"} -- You can modify this list dynamically
+
+            local GetPlayer = function(Name)
+                Name = Name:lower()
+                if Name == "all" or Name == "others" then
+                    AllBool = true
+                    return
+                elseif Name == "random" then
+                    local GetPlayers = Players:GetPlayers()
+                    table.remove(GetPlayers, table.find(GetPlayers, Player))
+                    return GetPlayers[math.random(#GetPlayers)]
+                else
+                    for _, x in next, Players:GetPlayers() do
+                        if x ~= Player then
+                            if x.Name:lower():match("^"..Name) or x.DisplayName:lower():match("^"..Name) then
+                                return x
+                            end
+                        end
+                    end
+                end
+            end
+
+            local Message = function(_Title, _Text, Time)
+                game:GetService("StarterGui"):SetCore("SendNotification", {Title = _Title, Text = _Text, Duration = Time})
+            end
+
+            local SkidFling = function(TargetPlayer)
+                local Character = Player.Character
+                local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+                local RootPart = Humanoid and Humanoid.RootPart
+
+                local TCharacter = TargetPlayer.Character
+                if not TCharacter then return end
+
+                local THumanoid = TCharacter:FindFirstChildOfClass("Humanoid")
+                local TRootPart = THumanoid and THumanoid.RootPart
+                local THead = TCharacter:FindFirstChild("Head")
+                local Accessory = TCharacter:FindFirstChildOfClass("Accessory")
+                local Handle = Accessory and Accessory:FindFirstChild("Handle")
+
+                if not (Character and Humanoid and RootPart) then return end
+
+                if RootPart.Velocity.Magnitude < 50 then
+                    getgenv().OldPos = RootPart.CFrame
+                end
+
+                local FPos = function(BasePart, Pos, Ang)
+                    RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
+                    Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
+                    RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
+                    RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+                end
+
+                local SFBasePart = function(BasePart)
+                    local TimeToWait = 2
+                    local Time = tick()
+                    local Angle = 0
+
+                    repeat
+                        if RootPart and THumanoid then
+                            Angle = Angle + 100
+                            FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle), 0, 0))
+                            task.wait()
+                            FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle), 0, 0))
+                            task.wait()
+                        end
+                    until BasePart.Velocity.Magnitude > 500 or tick() > Time + TimeToWait or not TCharacter:IsDescendantOf(workspace)
+                end
+
+                workspace.FallenPartsDestroyHeight = 0/0
+
+                local BV = Instance.new("BodyVelocity")
+                BV.Name = "EpixVel"
+                BV.Parent = RootPart
+                BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
+                BV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+
+                Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+
+                if TRootPart and THead then
+                    if (TRootPart.Position - THead.Position).Magnitude > 5 then
+                        SFBasePart(THead)
+                    else
+                        SFBasePart(TRootPart)
+                    end
+                elseif TRootPart then
+                    SFBasePart(TRootPart)
+                elseif THead then
+                    SFBasePart(THead)
+                elseif Handle then
+                    SFBasePart(Handle)
+                else
+                    Message("Error", "No valid parts found on target", 5)
+                end
+
+                BV:Destroy()
+                Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+                workspace.CurrentCamera.CameraSubject = Humanoid
+
+                repeat
+                    RootPart.CFrame = getgenv().OldPos * CFrame.new(0, .5, 0)
+                    Character:SetPrimaryPartCFrame(getgenv().OldPos * CFrame.new(0, .5, 0))
+                    Humanoid:ChangeState("GettingUp")
+                    for _, x in pairs(Character:GetChildren()) do
+                        if x:IsA("BasePart") then
+                            x.Velocity = Vector3.zero
+                            x.RotVelocity = Vector3.zero
+                        end
+                    end
+                    task.wait()
+                until (RootPart.Position - getgenv().OldPos.Position).Magnitude < 25
+                workspace.FallenPartsDestroyHeight = -500
+            end
+
+            -- Start fling process
+            if Targets[1] then
+                for _, x in next, Targets do
+                    GetPlayer(x)
+                end
+            else
+                return
+            end
+
+            if AllBool then
+                for _, x in next, Players:GetPlayers() do
+                    if x ~= Player then
+                        SkidFling(x)
+                    end
+                end
+            else
+                for _, x in next, Targets do
+                    local Target = GetPlayer(x)
+                    if Target and Target ~= Player then
+                        SkidFling(Target)
+                    else
+                        Message("Error", "Invalid Target: " .. tostring(x), 5)
+                    end
+                end
+            end
+
+        else
+            -- Toggle is OFF
+            Message("Auto Fling", "Disabled", 3)
+        end
+    end
+})
+
+
+local RightGroupBox = Tabs.Misc:AddRightGroupbox('Anti AFK')
+
+RightGroupBox:AddToggle('MyToggle', {
+    Text = 'ANTIAFK',
+    Default = false,
+    Tooltip = 'Prevents Roblox from kicking you for idling',
+
+    Callback = function(Value)
+        if Value then
+            -- Enable Anti-AFK
+            wait(0.5)
+            local ba = Instance.new("ScreenGui")
+            local ca = Instance.new("TextLabel")
+            local da = Instance.new("Frame")
+            local _b = Instance.new("TextLabel")
+            local ab = Instance.new("TextLabel")
+
+            ba.Name = "AntiAFKUI"
+            ba.Parent = game.CoreGui
+            ba.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+            ca.Parent = ba
+            ca.Active = true
+            ca.BackgroundColor3 = Color3.new(0.176, 0.176, 0.176)
+            ca.Draggable = true
+            ca.Position = UDim2.new(0.6986, 0, 0.098, 0)
+            ca.Size = UDim2.new(0, 370, 0, 52)
+            ca.Font = Enum.Font.SourceSansSemibold
+            ca.Text = "Anti Afk"
+            ca.TextColor3 = Color3.new(0, 1, 1)
+            ca.TextSize = 22
+
+            da.Parent = ca
+            da.BackgroundColor3 = Color3.new(0.196, 0.196, 0.196)
+            da.Position = UDim2.new(0, 0, 1.019, 0)
+            da.Size = UDim2.new(0, 370, 0, 107)
+
+            _b.Parent = da
+            _b.BackgroundColor3 = Color3.new(0.176, 0.176, 0.176)
+            _b.Position = UDim2.new(0, 0, 0.8, 0)
+            _b.Size = UDim2.new(0, 370, 0, 21)
+            _b.Font = Enum.Font.Arial
+            _b.Text = "ty for script .gg/traced"
+            _b.TextColor3 = Color3.new(0, 1, 1)
+            _b.TextSize = 20
+
+            ab.Name = "Status"
+            ab.Parent = da
+            ab.BackgroundColor3 = Color3.new(0.176, 0.176, 0.176)
+            ab.Position = UDim2.new(0, 0, 0.158, 0)
+            ab.Size = UDim2.new(0, 370, 0, 44)
+            ab.Font = Enum.Font.ArialBold
+            ab.Text = "Status: Active"
+            ab.TextColor3 = Color3.new(0, 1, 1)
+            ab.TextSize = 20
+
+            -- Store connections to disconnect later
+            getgenv().AntiAFK_Connection = game:GetService('Players').LocalPlayer.Idled:Connect(function()
+                local bb = game:GetService("VirtualUser")
+                bb:CaptureController()
+                bb:ClickButton2(Vector2.new())
+                ab.Text = "Roblox tried kicking you but I didn't let them!"
+                wait(2)
+                ab.Text = "Status: Active"
+            end)
+        else
+            -- Disable Anti-AFK
+            if getgenv().AntiAFK_Connection then
+                getgenv().AntiAFK_Connection:Disconnect()
+                getgenv().AntiAFK_Connection = nil
+            end
+
+            -- Remove GUI if it exists
+            local gui = game.CoreGui:FindFirstChild("AntiAFKUI")
+            if gui then
+                gui:Destroy()
+            end
+        end
+    end
+})
+
+local RightGroupBox = Tabs.Misc:AddRightGroupbox('Anti fling')
+
+RightGroupBox:AddToggle('MyToggle', {
+    Text = 'ANTIFLING',
+    Default = false,
+    Tooltip = 'Stops fling exploits from affecting you',
+
+    Callback = function(Value)
+        if Value then
+            -- Enable Anti-Fling
+            local Services = setmetatable({}, {
+                __index = function(Self, Index)
+                    local NewService = game:GetService(Index)
+                    if NewService then
+                        Self[Index] = NewService
+                    end
+                    return NewService
+                end
+            })
+
+            local LocalPlayer = Services.Players.LocalPlayer
+            getgenv().AntiFlingConnections = {}
+
+            local function PlayerAdded(Player)
+                local Detected = false
+                local Character, PrimaryPart
+
+                local function CharacterAdded(NewCharacter)
+                    Character = NewCharacter
+                    repeat wait() until NewCharacter:FindFirstChild("HumanoidRootPart")
+                    PrimaryPart = NewCharacter.HumanoidRootPart
+                    Detected = false
+                end
+
+                CharacterAdded(Player.Character or Player.CharacterAdded:Wait())
+                table.insert(getgenv().AntiFlingConnections, Player.CharacterAdded:Connect(CharacterAdded))
+
+                local beatConnection = Services.RunService.Heartbeat:Connect(function()
+                    if Character and Character:IsDescendantOf(workspace) and PrimaryPart and PrimaryPart:IsDescendantOf(Character) then
+                        if PrimaryPart.AssemblyAngularVelocity.Magnitude > 50 or PrimaryPart.AssemblyLinearVelocity.Magnitude > 100 then
+                            if not Detected then
+                                Services.StarterGui:SetCore("ChatMakeSystemMessage", {
+                                    Text = "Fling Exploit detected, Player: " .. tostring(Player),
+                                    Color = Color3.fromRGB(255, 200, 0),
+                                })
+                            end
+                            Detected = true
+                            for _, v in ipairs(Character:GetDescendants()) do
+                                if v:IsA("BasePart") then
+                                    v.CanCollide = false
+                                    v.AssemblyAngularVelocity = Vector3.zero
+                                    v.AssemblyLinearVelocity = Vector3.zero
+                                    v.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0)
+                                end
+                            end
+                            PrimaryPart.CanCollide = false
+                            PrimaryPart.AssemblyAngularVelocity = Vector3.zero
+                            PrimaryPart.AssemblyLinearVelocity = Vector3.zero
+                            PrimaryPart.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0)
+                        end
+                    end
+                end)
+                table.insert(getgenv().AntiFlingConnections, beatConnection)
+            end
+
+            for _, player in ipairs(Services.Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    PlayerAdded(player)
+                end
+            end
+
+            table.insert(getgenv().AntiFlingConnections, Services.Players.PlayerAdded:Connect(PlayerAdded))
+
+            local LastPosition = nil
+            local ownHeartbeat = Services.RunService.Heartbeat:Connect(function()
+                pcall(function()
+                    local char = LocalPlayer.Character
+                    local PrimaryPart = char and char:FindFirstChild("HumanoidRootPart")
+                    if not PrimaryPart then return end
+
+                    if PrimaryPart.AssemblyLinearVelocity.Magnitude > 250 or PrimaryPart.AssemblyAngularVelocity.Magnitude > 250 then
+                        PrimaryPart.AssemblyAngularVelocity = Vector3.zero
+                        PrimaryPart.AssemblyLinearVelocity = Vector3.zero
+                        if LastPosition then
+                            PrimaryPart.CFrame = LastPosition
+                        end
+                        Services.StarterGui:SetCore("ChatMakeSystemMessage", {
+                            Text = "You were flung. Neutralizing velocity.",
+                            Color = Color3.fromRGB(255, 0, 0),
+                        })
+                    elseif PrimaryPart.AssemblyLinearVelocity.Magnitude < 50 or PrimaryPart.AssemblyAngularVelocity.Magnitude < 50 then
+                        LastPosition = PrimaryPart.CFrame
+                    end
+                end)
+            end)
+            table.insert(getgenv().AntiFlingConnections, ownHeartbeat)
+        else
+            -- Disable Anti-Fling
+            if getgenv().AntiFlingConnections then
+                for _, connection in pairs(getgenv().AntiFlingConnections) do
+                    if connection and typeof(connection) == "Instance" or typeof(connection) == "RBXScriptConnection" then
+                        pcall(function() connection:Disconnect() end)
+                    end
+                end
+                getgenv().AntiFlingConnections = nil
+            end
+        end
+    end
+})
+
+
+
 
 RightGroupBox = Tabs.Misc:AddRightGroupbox('Cash Aura')
 
